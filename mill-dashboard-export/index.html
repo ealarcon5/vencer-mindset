@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mill's Daily Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #080808;
+      color: #f0f0f0;
+      min-height: 100vh;
+      padding: 32px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .topbar h1 { font-size: 1rem; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.12em; }
+    .topbar .date { font-size: 0.85rem; color: #444; }
+
+    /* FOCUS BAR */
+    .focus-bar {
+      background: linear-gradient(135deg, #141210, #0f0d0b);
+      border: 1px solid #2a2218;
+      border-left: 4px solid #C9A87C;
+      border-radius: 12px;
+      padding: 18px 24px;
+      margin-bottom: 20px;
+    }
+    .focus-bar .label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.14em; color: #C9A87C; font-weight: 700; margin-bottom: 5px; }
+    .focus-bar .focus-text { font-size: 1.25rem; font-weight: 800; color: #fff; }
+    .focus-bar .focus-sub { font-size: 0.82rem; color: #777; margin-top: 5px; }
+
+    /* STATS ROW */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: #0d0d0d;
+      border: 1px solid #1a1a1a;
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .stat-value { font-size: 1.3rem; font-weight: 800; color: #fff; }
+    .stat-label { font-size: 0.65rem; color: #444; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+    .stat-sub { font-size: 0.7rem; color: #6bcb77; margin-top: 2px; }
+    .stat-sub.warn { color: #ffd93d; }
+
+    /* GRID */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: #111111; border: 1px solid #1e1e1e; border-radius: 12px; padding: 18px 20px; }
+    .card.full-width { grid-column: 1 / -1; }
+    .card-label {
+      font-size: 0.63rem;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+    .card-label.red { color: #ff6b6b; }
+    .card-label.yellow { color: #ffd93d; }
+    .card-label.purple { color: #C9A87C; }
+    .card-label.blue { color: #B8A898; }
+    .card-label.green { color: #6bcb77; }
+    .card-label.orange { color: #ff9f43; }
+    .card-label.white { color: #aaa; }
+
+    /* SCHEDULE TABLE */
+    .schedule-table { width: 100%; border-collapse: collapse; }
+    .schedule-table tr { border-bottom: 1px solid #1f1f1f; }
+    .schedule-table tr:last-child { border-bottom: none; }
+    .schedule-table td { padding: 9px 6px; font-size: 0.85rem; vertical-align: top; }
+    .schedule-table .time-col { color: #555; white-space: nowrap; width: 110px; padding-right: 14px; font-size: 0.78rem; padding-top: 10px; }
+    .schedule-table .block-name { font-weight: 600; color: #eee; }
+    .schedule-table .block-desc { font-size: 0.75rem; color: #555; margin-top: 2px; }
+    .block-tag {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      margin-left: 6px;
+      vertical-align: middle;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .tag-needle { background: #C9A87C22; color: #C9A87C; border: 1px solid #C9A87C44; }
+    .tag-content { background: #c1358422; color: #e84393; border: 1px solid #c1358444; }
+    .tag-personal { background: #4ecdc422; color: #4ecdc4; border: 1px solid #4ecdc444; }
+    .tag-life { background: #33333388; color: #777; border: 1px solid #444; }
+    .tag-work { background: #ff9f4322; color: #ff9f43; border: 1px solid #ff9f4344; }
+    .tag-gap { background: #6bcb7722; color: #6bcb77; border: 1px solid #6bcb7744; }
+
+    /* TODO ITEMS */
+    .todo-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid #1f1f1f;
+      cursor: pointer;
+    }
+    .todo-item:last-child { border-bottom: none; }
+    .todo-item input[type="checkbox"] { margin-top: 2px; width: 15px; height: 15px; accent-color: #C9A87C; cursor: pointer; flex-shrink: 0; }
+    .todo-item label { font-size: 0.875rem; color: #ccc; cursor: pointer; line-height: 1.4; flex: 1; }
+    .todo-item.done label { text-decoration: line-through; color: #3a3a3a; }
+    .todo-tag { font-size: 0.6rem; background: #222; border-radius: 4px; padding: 2px 6px; color: #555; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+
+    /* CONTENT POSTS */
+    .post-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #1f1f1f;
+    }
+    .post-item:last-child { border-bottom: none; }
+    .post-item input[type="checkbox"] { margin-top: 3px; width: 15px; height: 15px; accent-color: #C9A87C; cursor: pointer; flex-shrink: 0; }
+    .platform-badge { font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+    .badge-tiktok { background: #ff0050; color: #fff; }
+    .badge-ig { background: #c13584; color: #fff; }
+    .badge-x { background: #333; color: #fff; border: 1px solid #555; }
+    .badge-threads { background: #2a2a2a; color: #aaa; border: 1px solid #444; }
+    .badge-longform { background: #ff9f43; color: #fff; }
+    .post-title { font-size: 0.875rem; font-weight: 600; color: #ddd; margin-bottom: 2px; }
+    .post-desc { font-size: 0.75rem; color: #555; line-height: 1.4; }
+    .post-item.done .post-title { text-decoration: line-through; color: #3a3a3a; }
+    .post-item.done .post-desc { color: #2a2a2a; }
+
+    /* WORKOUT */
+    .workout-day-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+    .day-btn {
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid #333;
+      background: #141414;
+      color: #555;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .day-btn.active { background: #C9A87C22; border-color: #C9A87C; color: #C9A87C; }
+    .workout-section { display: none; }
+    .workout-section.active { display: block; }
+    .workout-phase {
+      margin-bottom: 12px;
+    }
+    .phase-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; color: #555; font-weight: 700; margin-bottom: 6px; }
+    .exercise-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #1f1f1f;
+    }
+    .exercise-row:last-child { border-bottom: none; }
+    .exercise-row input[type="checkbox"] { width: 14px; height: 14px; accent-color: #C9A87C; cursor: pointer; flex-shrink: 0; }
+    .ex-name { font-size: 0.85rem; font-weight: 600; color: #ddd; flex: 1; }
+    .ex-sets { font-size: 0.75rem; color: #555; white-space: nowrap; }
+    .exercise-row.done .ex-name { text-decoration: line-through; color: #333; }
+
+    /* ROADMAP */
+    .roadmap-phases { display: flex; flex-direction: column; gap: 8px; }
+    .phase-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #141414;
+      border: 1px solid #222;
+    }
+    .phase-row.current { background: #161310; border-color: #C9A87C55; }
+    .phase-row.done-phase { opacity: 0.4; }
+    .phase-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #222;
+      color: #555;
+      font-size: 0.7rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .phase-row.current .phase-num { background: #C9A87C; color: #fff; }
+    .phase-row.done-phase .phase-num { background: #6bcb77; color: #0f0f0f; }
+    .phase-info { flex: 1; }
+    .phase-title { font-size: 0.875rem; font-weight: 700; color: #ddd; }
+    .phase-row.current .phase-title { color: #fff; }
+    .phase-sub { font-size: 0.72rem; color: #555; margin-top: 2px; }
+    .phase-badge {
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .phase-badge.now { background: #C9A87C22; color: #C9A87C; border: 1px solid #C9A87C44; }
+    .phase-badge.next { background: #ffd93d22; color: #ffd93d; border: 1px solid #ffd93d44; }
+    .phase-badge.later { background: #22222288; color: #444; border: 1px solid #333; }
+
+    /* SERIES TRACKER */
+    .series-row { display: flex; gap: 8px; }
+    .ep-pill {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 10px 10px;
+      flex: 1;
+    }
+    .ep-pill.active { border-color: #C9A87C; background: #161310; }
+    .ep-num { font-size: 0.6rem; color: #444; text-transform: uppercase; letter-spacing: 0.1em; }
+    .ep-pill.active .ep-num { color: #C9A87C; }
+    .ep-title { font-size: 0.72rem; font-weight: 600; color: #888; text-align: center; margin-top: 4px; line-height: 1.3; }
+    .ep-pill.active .ep-title { color: #ddd; }
+    .ep-status { font-size: 0.6rem; margin-top: 4px; color: #333; }
+    .ep-pill.active .ep-status { color: #C9A87C; }
+
+    /* FOOTER */
+    .footer { margin-top: 28px; text-align: center; font-size: 0.68rem; color: #2a2a2a; }
+
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .series-row { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <h1>Mill's Dashboard</h1>
+    <div class="date" id="live-date"></div>
+  </div>
+
+  <!-- FOCUS BAR -->
+  <div class="focus-bar">
+    <div class="label">Needle Mover Today</div>
+    <div class="focus-text">Fulfill All Vencer Orders — Right Now</div>
+    <div class="focus-sub">Customers are waiting. This is revenue already made — just needs to ship. 1–1.5 hours, then the rest of the day opens up.</div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-value">~$18</div>
+      <div class="stat-label">Current AOV</div>
+      <div class="stat-sub warn">Target: $35–$45</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">5–8pm</div>
+      <div class="stat-label">Vencer Baseball</div>
+      <div class="stat-sub">Clients Tonight</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">100</div>
+      <div class="stat-label">Creative Rise</div>
+      <div class="stat-sub">Discord Members</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value">0 / 4</div>
+      <div class="stat-label">Posts Done Today</div>
+      <div class="stat-sub">4 scheduled</div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- DAILY SCHEDULE -->
+    <div class="card full-width">
+      <div class="card-label white">Today's Schedule — Mon Mar 30 (starting now, 11am)</div>
+      <table class="schedule-table">
+        <tr>
+          <td class="time-col">✅ Done</td>
+          <td>
+            <div class="block-name">Workout <span class="block-tag tag-personal">Done</span></div>
+            <div class="block-desc">Already handled. Good start.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">11:00 AM – 12:30</td>
+          <td>
+            <div class="block-name">Fulfill All Vencer Orders <span class="block-tag tag-needle">Needle Mover</span></div>
+            <div class="block-desc">Pack, label, drop off. 1–1.5 hours. Revenue already made — just needs to ship. Do this first, everything else stacks behind it.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">12:30 – 1:00</td>
+          <td>
+            <div class="block-name">Text Clients + People <span class="block-tag tag-work">Outreach</span></div>
+            <div class="block-desc">Follow-ups, check-ins, anything pending. Batch it — 30 min, done.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">1:00 – 1:45</td>
+          <td>
+            <div class="block-name">Lunch <span class="block-tag tag-life">Life</span></div>
+            <div class="block-desc">Eat. Step away. Reset before the afternoon push.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">1:45 – 3:00</td>
+          <td>
+            <div class="block-name">Edit Videos + Post <span class="block-tag tag-content">Content</span></div>
+            <div class="block-desc">Edit the footage, add captions, post. TikTok first, then IG. Content posted = engine running.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">3:00 – 3:30</td>
+          <td>
+            <div class="block-name">Pay Invoices + Get Ready <span class="block-tag tag-work">Ops</span></div>
+            <div class="block-desc">Clear outstanding invoices. Then get ready. Don't let this bleed past 3:30.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">5:00 – 8:00 PM</td>
+          <td>
+            <div class="block-name">Baseball Client Training <span class="block-tag tag-work">Work</span></div>
+            <div class="block-desc">Locked in. Be present. Gaps between sessions = phone down.</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="time-col">8:00 PM+</td>
+          <td>
+            <div class="block-name">Home + Wind Down <span class="block-tag tag-life">Life</span></div>
+            <div class="block-desc">Dinner, fiancée, rest. No screens after 9 PM.</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- DAILY MUST-DOS -->
+    <div class="card">
+      <div class="card-label red">Must Do Today</div>
+      <div class="todo-item" onclick="toggle(this)">
+        <input type="checkbox" />
+        <label>Fulfill all Vencer Co orders — pack, label, ship</label>
+        <span class="todo-tag">Needle Mover</span>
+      </div>
+      <div class="todo-item" onclick="toggle(this)">
+        <input type="checkbox" />
+        <label>Edit videos + post (TikTok first, then IG)</label>
+        <span class="todo-tag">Content</span>
+      </div>
+      <div class="todo-item" onclick="toggle(this)">
+        <input type="checkbox" />
+        <label>Pay outstanding invoices</label>
+        <span class="todo-tag">Ops</span>
+      </div>
+
+      <div class="card-label yellow" style="margin-top:18px;">Quick Wins (batch these)</div>
+      <div class="todo-item" onclick="toggle(this)">
+        <input type="checkbox" />
+        <label>Text clients + follow-ups</label>
+        <span class="todo-tag">Outreach</span>
+      </div>
+      <div class="todo-item" onclick="toggle(this)">
+        <input type="checkbox" />
+        <label>Get ready before 3:30 PM</label>
+        <span class="todo-tag">Life</span>
+      </div>
+    </div>
+
+    <!-- VENCER CO ROADMAP -->
+    <div class="card">
+      <div class="card-label orange">Vencer Co — Road to Ads</div>
+      <div class="roadmap-phases">
+        <div class="phase-row current">
+          <div class="phase-num">1</div>
+          <div class="phase-info">
+            <div class="phase-title">Email Flows (Klaviyo)</div>
+            <div class="phase-sub">Abandoned cart, welcome series, post-purchase. Works 24/7.</div>
+          </div>
+          <span class="phase-badge now">Now</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">2</div>
+          <div class="phase-info">
+            <div class="phase-title">Finalize Bundle Offer</div>
+            <div class="phase-sub">Set live on Shopify. AOV target: $35+.</div>
+          </div>
+          <span class="phase-badge next">Next</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">3</div>
+          <div class="phase-info">
+            <div class="phase-title">Website + Product Images</div>
+            <div class="phase-sub">Optimize for conversion. Clean photography.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">4</div>
+          <div class="phase-info">
+            <div class="phase-title">Organic Content System</div>
+            <div class="phase-sub">Test creatives organically first. Find what converts.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">5</div>
+          <div class="phase-info">
+            <div class="phase-title">Meta Ads</div>
+            <div class="phase-sub">Push best organic content into paid. AOV must be $35+ first.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- VENCER BASEBALL PRIORITIES -->
+    <div class="card">
+      <div class="card-label green">Vencer Baseball — Priorities</div>
+      <div class="roadmap-phases">
+        <div class="phase-row current">
+          <div class="phase-num">1</div>
+          <div class="phase-info">
+            <div class="phase-title">Fill Hit Club Slots</div>
+            <div class="phase-sub">Evening training 5–8pm. Pack the facility. Max 5 per group.</div>
+          </div>
+          <span class="phase-badge now">Now</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">2</div>
+          <div class="phase-info">
+            <div class="phase-title">Infield / Ground Ball Academy</div>
+            <div class="phase-sub">Sessions scheduled and sold. Separate revenue stream.</div>
+          </div>
+          <span class="phase-badge next">Next</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">3</div>
+          <div class="phase-info">
+            <div class="phase-title">Summer 2026 Teams</div>
+            <div class="phase-sub">Roster locked, coaches confirmed, schedule set.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">4</div>
+          <div class="phase-info">
+            <div class="phase-title">Elite Recruitment Program</div>
+            <div class="phase-sub">College placement plans + scout days live for Elite members.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">5</div>
+          <div class="phase-info">
+            <div class="phase-title">Reduce Owner-Operator Dependency</div>
+            <div class="phase-sub">Hire coaches so facility runs without you every session.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CREATIVE RISE SOCIETY -->
+    <div class="card">
+      <div class="card-label blue">Creative Rise Society — Priorities</div>
+      <div style="display:flex; gap:10px; margin-bottom:16px;">
+        <div class="stat-box" style="flex:1; padding:10px 8px;">
+          <div class="stat-value" style="font-size:1.1rem;">100</div>
+          <div class="stat-label">Members</div>
+        </div>
+        <div class="stat-box" style="flex:1; padding:10px 8px;">
+          <div class="stat-value" style="font-size:0.85rem;">UGC/VSL</div>
+          <div class="stat-label">Ad Format</div>
+        </div>
+        <div class="stat-box" style="flex:1; padding:10px 8px;">
+          <div class="stat-value" style="font-size:0.85rem;">Tribe</div>
+          <div class="stat-label">Platform</div>
+        </div>
+      </div>
+      <div class="roadmap-phases">
+        <div class="phase-row current">
+          <div class="phase-num">1</div>
+          <div class="phase-info">
+            <div class="phase-title">Run Active Brand Campaigns</div>
+            <div class="phase-sub">Connect members with live brand deals. Revenue share flowing.</div>
+          </div>
+          <span class="phase-badge now">Now</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">2</div>
+          <div class="phase-info">
+            <div class="phase-title">Creator Training Content</div>
+            <div class="phase-sub">High-converting UGC + VSL frameworks taught inside Discord.</div>
+          </div>
+          <span class="phase-badge next">Next</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">3</div>
+          <div class="phase-info">
+            <div class="phase-title">Scale to 250 Members</div>
+            <div class="phase-sub">More creators = more capacity = more brand partnerships.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">4</div>
+          <div class="phase-info">
+            <div class="phase-title">Productize the Offer</div>
+            <div class="phase-sub">Package training + placement as a standalone paid program.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TODAY'S CONTENT -->
+    <div class="card full-width">
+      <div class="card-label purple">Today's Content — EP 1 Week</div>
+      <div class="post-item" onclick="togglePost(this)">
+        <input type="checkbox" />
+        <span class="platform-badge badge-tiktok">TikTok</span>
+        <div class="post-content">
+          <div class="post-title">EP 1 Repost — "Thinking Will Destroy Your Confidence"</div>
+          <div class="post-desc">Already filmed. Repost or re-upload. CTA: Comment "MIND" for discount. Do this in morning Work Block 1.</div>
+        </div>
+      </div>
+      <div class="post-item" onclick="togglePost(this)">
+        <input type="checkbox" />
+        <span class="platform-badge badge-x">X Thread</span>
+        <div class="post-content">
+          <div class="post-title">EP 1 Thread — "Thinking will destroy your confidence"</div>
+          <div class="post-desc">7 tweets. Full copy ready in the skill file. Hook → problem → fix → Duran → CTA.</div>
+        </div>
+      </div>
+      <div class="post-item" onclick="togglePost(this)">
+        <input type="checkbox" />
+        <span class="platform-badge badge-ig">Instagram</span>
+        <div class="post-content">
+          <div class="post-title">EP 1 Carousel — Brain vs. Pressure</div>
+          <div class="post-desc">5–6 slides. Hook: "Your brain reacts to negative thoughts the same way it reacts to a real threat." Copy in skill file.</div>
+        </div>
+      </div>
+      <div class="post-item" onclick="togglePost(this)">
+        <input type="checkbox" />
+        <span class="platform-badge badge-threads">Threads</span>
+        <div class="post-content">
+          <div class="post-title">EP 1 Long-form post</div>
+          <div class="post-desc">Essay-style. Full copy ready in skill file. Copy/paste and post.</div>
+        </div>
+      </div>
+      <div class="post-item" onclick="togglePost(this)">
+        <input type="checkbox" />
+        <span class="platform-badge badge-longform">Long Form</span>
+        <div class="post-content">
+          <div class="post-title">Personal Brand — 30–60 Min Long Form Video</div>
+          <div class="post-desc">Film in 8:30–10:00 block. Topic: your story, psychology content, mental game. This feeds the brand and gets repurposed into shorts.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERSONAL BRAND — VENCER MINDSET -->
+    <div class="card full-width">
+      <div class="card-label purple">Personal Brand — Vencer Mindset World Building</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div style="background:#141414; border:1px solid #2a2218; border-left:3px solid #C9A87C; border-radius:8px; padding:12px 14px;">
+          <div style="font-size:0.6rem; text-transform:uppercase; letter-spacing:0.12em; color:#C9A87C; font-weight:700; margin-bottom:4px;">Brand Lens</div>
+          <div style="font-size:0.8rem; color:#ddd; line-height:1.4;">How do you build something real in a world full of noise — and turn that into a business that runs on your terms?</div>
+        </div>
+        <div style="background:#141414; border:1px solid #222; border-radius:8px; padding:12px 14px;">
+          <div style="font-size:0.6rem; text-transform:uppercase; letter-spacing:0.12em; color:#B8A898; font-weight:700; margin-bottom:4px;">Brand Focus</div>
+          <div style="font-size:0.8rem; color:#ddd; line-height:1.4;">Help business owners build a sovereign personal brand that attracts the right people — no funnels, no sales calls.</div>
+        </div>
+        <div style="background:#141414; border:1px solid #222; border-radius:8px; padding:12px 14px;">
+          <div style="font-size:0.6rem; text-transform:uppercase; letter-spacing:0.12em; color:#6bcb77; font-weight:700; margin-bottom:4px;">Current Phase</div>
+          <div style="font-size:0.8rem; color:#ddd; line-height:1.4;">Phase 1–2 — Building identity foundation + brand architecture. First landmark in development.</div>
+        </div>
+      </div>
+      <div class="roadmap-phases">
+        <div class="phase-row current">
+          <div class="phase-num">1</div>
+          <div class="phase-info">
+            <div class="phase-title">Complete Identity Foundation</div>
+            <div class="phase-sub">Answer the 6 questions. Fill in Phase 1 worksheet. This is the invisible layer everything else builds on.</div>
+          </div>
+          <span class="phase-badge now">Now</span>
+        </div>
+        <div class="phase-row current">
+          <div class="phase-num">2</div>
+          <div class="phase-info">
+            <div class="phase-title">Define Brand Lens + Brand Focus</div>
+            <div class="phase-sub">The guiding question that contains all your interests. The specific problem you solve for business owners.</div>
+          </div>
+          <span class="phase-badge now">Now</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">3</div>
+          <div class="phase-info">
+            <div class="phase-title">Build First Landmark</div>
+            <div class="phase-sub">Name and develop your first core concept. Language, visual anchor, system behind it.</div>
+          </div>
+          <span class="phase-badge next">Next</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">4</div>
+          <div class="phase-info">
+            <div class="phase-title">Launch Depth Platform (Newsletter / Substack)</div>
+            <div class="phase-sub">Where trust compounds. First 4 issues before any offer mention.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+        <div class="phase-row">
+          <div class="phase-num">5</div>
+          <div class="phase-info">
+            <div class="phase-title">Open First Offer (No Sales Calls)</div>
+            <div class="phase-sub">Async application. Group cohort for business owners. Invitation, not a launch.</div>
+          </div>
+          <span class="phase-badge later">Later</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORKOUT -->
+    <div class="card full-width">
+      <div class="card-label green">Today's Workout — 45 Min</div>
+      <div class="workout-day-toggle">
+        <button class="day-btn active" onclick="switchDay('a', this)">Day A — Push / Lower</button>
+        <button class="day-btn" onclick="switchDay('b', this)">Day B — Pull / Core</button>
+      </div>
+
+      <!-- DAY A -->
+      <div class="workout-section active" id="day-a">
+        <div class="workout-phase">
+          <div class="phase-label">Warm-Up — 5 min</div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Jump rope or jumping jacks</div>
+            <div class="ex-sets">2 min</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Hip circles + leg swings + arm circles</div>
+            <div class="ex-sets">3 min</div>
+          </div>
+        </div>
+        <div class="workout-phase">
+          <div class="phase-label">Main Work — 30 min</div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Back Squat (or Goblet Squat)</div>
+            <div class="ex-sets">4 x 6–8</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">DB Bench Press</div>
+            <div class="ex-sets">3 x 10</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Romanian Deadlift</div>
+            <div class="ex-sets">3 x 10</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">DB Shoulder Press</div>
+            <div class="ex-sets">3 x 10</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Push-ups</div>
+            <div class="ex-sets">2 x 15</div>
+          </div>
+        </div>
+        <div class="workout-phase">
+          <div class="phase-label">Finisher — 10 min (3 rounds, no rest)</div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Box Jumps</div>
+            <div class="ex-sets">10 reps</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">KB Swings</div>
+            <div class="ex-sets">15 reps</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DAY B -->
+      <div class="workout-section" id="day-b">
+        <div class="workout-phase">
+          <div class="phase-label">Warm-Up — 5 min</div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Band pull-aparts</div>
+            <div class="ex-sets">3 x 20</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Cat-cow + thoracic rotation</div>
+            <div class="ex-sets">3 min</div>
+          </div>
+        </div>
+        <div class="workout-phase">
+          <div class="phase-label">Main Work — 30 min</div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Deadlift</div>
+            <div class="ex-sets">4 x 5</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Pull-ups (or Lat Pulldown)</div>
+            <div class="ex-sets">4 x 8</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">DB Single-Arm Row</div>
+            <div class="ex-sets">3 x 10 each</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Face Pulls</div>
+            <div class="ex-sets">3 x 15</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Curl variation</div>
+            <div class="ex-sets">2 x 12</div>
+          </div>
+        </div>
+        <div class="workout-phase">
+          <div class="phase-label">Finisher — 10 min (3 rounds, no rest)</div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Medicine Ball Slams</div>
+            <div class="ex-sets">10 reps</div>
+          </div>
+          <div class="exercise-row">
+            <input type="checkbox" onchange="toggleEx(this)" />
+            <div class="ex-name">Plank</div>
+            <div class="ex-sets">30 sec</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SERIES TRACKER -->
+    <div class="card full-width">
+      <div class="card-label blue">Words on the Wrist — Series Progress</div>
+      <div class="series-row">
+        <div class="ep-pill active">
+          <div class="ep-num">EP 1</div>
+          <div class="ep-title">Thinking Destroys Confidence</div>
+          <div class="ep-status">This week</div>
+        </div>
+        <div class="ep-pill">
+          <div class="ep-num">EP 2</div>
+          <div class="ep-title">They All Do It</div>
+          <div class="ep-status">Week 2</div>
+        </div>
+        <div class="ep-pill">
+          <div class="ep-num">EP 3</div>
+          <div class="ep-title">The Science (Pavlov)</div>
+          <div class="ep-status">Week 3</div>
+        </div>
+        <div class="ep-pill">
+          <div class="ep-num">EP 4</div>
+          <div class="ep-title">The Emiliano Story</div>
+          <div class="ep-status">Week 4</div>
+        </div>
+        <div class="ep-pill">
+          <div class="ep-num">EP 5</div>
+          <div class="ep-title">Build Your Own System</div>
+          <div class="ep-status">Week 5</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">Updated by Claude — April 23, 2026</div>
+
+  <script>
+    // Live date
+    document.getElementById('live-date').textContent =
+      new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Todo toggle
+    function toggle(item) {
+      const cb = item.querySelector('input[type="checkbox"]');
+      cb.checked = !cb.checked;
+      item.classList.toggle('done', cb.checked);
+    }
+
+    // Post toggle
+    function togglePost(item) {
+      const cb = item.querySelector('input[type="checkbox"]');
+      cb.checked = !cb.checked;
+      item.classList.toggle('done', cb.checked);
+    }
+
+    // Exercise toggle
+    function toggleEx(cb) {
+      cb.closest('.exercise-row').classList.toggle('done', cb.checked);
+    }
+
+    // Workout day switch
+    function switchDay(day, btn) {
+      document.querySelectorAll('.workout-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('day-' + day).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // Direct checkbox clicks don't double-fire
+    document.querySelectorAll('.todo-item input, .post-item input').forEach(cb => {
+      cb.addEventListener('click', e => e.stopPropagation());
+    });
+  </script>
+</body>
+</html>
