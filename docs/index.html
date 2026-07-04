@@ -78,6 +78,16 @@
     line-height:1.45;
   }
   .stars{font-size:1.1rem;letter-spacing:6px;color:var(--star);margin-top:10px;}
+  .mode-pill{
+    display:inline-flex;align-items:center;gap:7px;
+    margin-top:14px;padding:6px 14px;border-radius:999px;
+    font-size:.76rem;font-weight:700;letter-spacing:.3px;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+    color:#fff;backdrop-filter:blur(4px);
+  }
+  .mode-pill .dot{width:9px;height:9px;border-radius:50%;background:#9aa0ad;}
+  .mode-pill.live .dot{background:#4ade80;box-shadow:0 0 0 0 rgba(74,222,128,.7);animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,222,128,.6);}70%{box-shadow:0 0 0 8px rgba(74,222,128,0);}100%{box-shadow:0 0 0 0 rgba(74,222,128,0);}}
   /* ---------- Layout ---------- */
   main{max-width:920px;margin:0 auto;padding:22px 16px 60px;}
   .tabs{
@@ -190,6 +200,7 @@
   <h1>🎆 4th of July Parade<br/>Float Voting 🎆</h1>
   <p class="sub">Saw a float you loved? Cast your vote below. Pick your favorite in each category — the top 3 update live as the votes roll in.</p>
   <div class="stars">★ ★ ★ ★ ★</div>
+  <div><span class="mode-pill" id="modePill"><span class="dot"></span><span id="modeText">Loading…</span></span></div>
 </header>
 
 <main>
@@ -208,7 +219,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
 /* ============================================================
    PARADE FLOAT VOTING
    -----------------------------------------------------------
@@ -216,13 +227,29 @@
    the category "lenses" (CATEGORIES). Every category keeps its
    own separate Top 3 tally over the same floats.
 
-   TO ADD / EDIT FLOATS: just edit the FLOATS array below.
-   Give every float a UNIQUE id. That's the only list to touch.
+   TWO MODES:
+   • SHARED  — everyone's votes combine in real time (needs the
+     Firebase config below to be filled in).
+   • LOCAL   — votes are saved on each device only (the default
+     until you add the Firebase config).
 
-   Votes are stored in this browser (localStorage) so people
-   can't vote twice from the same phone. See README for how to
-   swap in a shared backend if you want one combined tally.
+   >>> TO TURN ON SHARED VOTING: paste your Firebase web config
+       into FIREBASE_CONFIG below. See README for the 2-min setup.
+
+   TO ADD / EDIT FLOATS: just edit the FLOATS array. Give every
+   float a UNIQUE id. That's the only list you normally touch.
    ============================================================ */
+
+  /* ===== PASTE YOUR FIREBASE CONFIG HERE (from the Firebase console) =====
+     Leave the fields empty and the site runs in LOCAL (per-device) mode. */
+  const FIREBASE_CONFIG = {
+    apiKey: "",
+    authDomain: "",
+    databaseURL: "",   // e.g. https://your-project-default-rtdb.firebaseio.com
+    projectId: "",
+  };
+
+  const SHARED = !!(FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.apiKey);
 
   // ---- The real parade entries (edit this list) ----
   const FLOATS = [
@@ -255,7 +282,7 @@
     { id:"crowd",     name:"Crowd Favorite", emoji:"⭐", blurb:"The float that got the biggest cheer down the whole route." },
   ];
 
-  const STORE_VOTES = "parade_votes_v2";   // { catId: { floatId: count } }
+  const STORE_VOTES = "parade_votes_v2";   // local mode only: { catId: { floatId: count } }
   const STORE_MINE  = "parade_myvotes_v2"; // { catId: floatId }
 
   function load(key, fallback){
@@ -264,21 +291,42 @@
   }
   function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
 
-  let votes  = load(STORE_VOTES, {});
+  // votes = { catId: { floatId: count } }.  myVotes = { catId: floatId } (this device's picks)
+  let votes   = SHARED ? {} : load(STORE_VOTES, {});
   let myVotes = load(STORE_MINE, {});
+  function count(catId, floatId){ return (votes[catId] && votes[catId][floatId]) || 0; }
+  function bump(catId, floatId, delta){
+    if(!votes[catId]) votes[catId] = {};
+    votes[catId][floatId] = Math.max(0, (votes[catId][floatId]||0) + delta);
+  }
 
-  // seed: every category holds a count for every float
-  CATEGORIES.forEach(cat => {
-    if(!votes[cat.id]) votes[cat.id] = {};
-    FLOATS.forEach(f => {
-      if(votes[cat.id][f.id] === undefined) votes[cat.id][f.id] = 0;
-    });
-  });
-
-  const tabsEl = document.getElementById("tabs");
+  const tabsEl   = document.getElementById("tabs");
   const panelsEl = document.getElementById("panels");
-  const toastEl = document.getElementById("toast");
-  let activeCat = CATEGORIES[0].id;
+  const toastEl  = document.getElementById("toast");
+  let activeCat  = CATEGORIES[0].id;
+
+  // ---- Firebase (loaded only when SHARED, so LOCAL mode needs no network) ----
+  let db=null, fbRef=null, fbRunTransaction=null;
+  async function initFirebase(){
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const { getDatabase, ref, onValue, runTransaction } =
+      await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+    const app = initializeApp(FIREBASE_CONFIG);
+    db = getDatabase(app);
+    fbRef = ref; fbRunTransaction = runTransaction;
+    onValue(ref(db, "votes"), (snap) => { votes = snap.val() || {}; refreshAll(); });
+  }
+  async function pushVote(catId, floatId, delta){
+    if(!db) return;
+    await fbRunTransaction(fbRef(db, `votes/${catId}/${floatId}`), (cur) => Math.max(0, (cur||0) + delta));
+  }
+
+  function setModePill(){
+    const pill = document.getElementById("modePill");
+    const text = document.getElementById("modeText");
+    if(SHARED){ pill.classList.add("live"); text.textContent = "Live — everyone's votes combined"; }
+    else { pill.classList.remove("live"); text.textContent = "Preview — votes saved on this device"; }
+  }
 
   function toast(msg){
     toastEl.innerHTML = msg;
@@ -318,20 +366,26 @@
     });
   }
 
+  function refreshAll(){
+    CATEGORIES.forEach(cat => {
+      if(document.getElementById("lb-"+cat.id)){ renderLeaderboard(cat); renderFloats(cat); }
+    });
+  }
+
   function renderLeaderboard(cat){
     const el = document.getElementById("lb-"+cat.id);
-    const tally = votes[cat.id];
-    const ranked = [...FLOATS].sort((a,b)=> tally[b.id]-tally[a.id]);
+    if(!el) return;
+    const ranked = [...FLOATS].sort((a,b)=> count(cat.id,b.id)-count(cat.id,a.id));
     const top = ranked.slice(0,3);
-    const totalVotes = FLOATS.reduce((s,f)=>s+tally[f.id],0);
+    const totalVotes = FLOATS.reduce((s,f)=>s+count(cat.id,f.id),0);
 
     if(totalVotes === 0){
       el.innerHTML = `<div class="empty">No votes yet — be the first to pick a winner! 🎉</div>`;
       return;
     }
-    const max = Math.max(...FLOATS.map(f=>tally[f.id]), 1);
+    const max = Math.max(...FLOATS.map(f=>count(cat.id,f.id)), 1);
     el.innerHTML = top.map((f,i)=>{
-      const v = tally[f.id];
+      const v = count(cat.id,f.id);
       const pct = Math.round((v/max)*100);
       const rankClass = i===0?"rank-1":i===1?"rank-2":"rank-3";
       const medal = i===0?"🥇":i===1?"🥈":"🥉";
@@ -349,7 +403,7 @@
 
   function renderFloats(cat){
     const el = document.getElementById("floats-"+cat.id);
-    const tally = votes[cat.id];
+    if(!el) return;
     const mine = myVotes[cat.id];
     el.innerHTML = FLOATS.map(f=>{
       const voted = mine === f.id;
@@ -364,7 +418,7 @@
           </div>
           <button class="vote-btn" data-cat="${cat.id}" data-float="${f.id}">
             ${voted ? "Your pick" : "Vote"}
-            <span class="count">${tally[f.id]}</span>
+            <span class="count">${count(cat.id,f.id)}</span>
           </button>
           <div class="voted-note">${voted ? "✓ You voted for this float" : ""}</div>
         </div>`;
@@ -376,41 +430,50 @@
   }
 
   function castVote(catId, floatId){
-    const cat = CATEGORIES.find(c=>c.id===catId);
     const float = FLOATS.find(f=>f.id===floatId);
-    const tally = votes[catId];
     const prev = myVotes[catId];
 
     if(prev === floatId){
-      tally[floatId] = Math.max(0, tally[floatId]-1);
+      // toggle off
+      bump(catId, floatId, -1);
+      if(SHARED) pushVote(catId, floatId, -1);
       delete myVotes[catId];
       toast("↩️ Vote removed");
     } else {
-      if(prev) tally[prev] = Math.max(0, tally[prev]-1);
-      tally[floatId] = (tally[floatId]||0)+1;
+      if(prev){ bump(catId, prev, -1); if(SHARED) pushVote(catId, prev, -1); }
+      bump(catId, floatId, +1);
+      if(SHARED) pushVote(catId, floatId, +1);
       myVotes[catId] = floatId;
       toast(`✓ Voted: <strong style="margin-left:4px">${float.name}</strong>`);
     }
-    save(STORE_VOTES, votes);
     save(STORE_MINE, myVotes);
-    renderLeaderboard(cat);
-    renderFloats(cat);
+    if(!SHARED) save(STORE_VOTES, votes);
+    refreshAll(); // instant feedback; in SHARED mode the live sync confirms the true totals
   }
 
   document.getElementById("resetBtn").onclick = () => {
     if(!confirm("Remove your votes from this device? (Everyone else's votes stay.)")) return;
     Object.keys(myVotes).forEach(catId=>{
       const fId = myVotes[catId];
-      if(votes[catId] && votes[catId][fId]) votes[catId][fId] = Math.max(0, votes[catId][fId]-1);
+      bump(catId, fId, -1);
+      if(SHARED) pushVote(catId, fId, -1);
     });
     myVotes = {};
-    save(STORE_VOTES, votes);
     save(STORE_MINE, myVotes);
-    build();
+    if(!SHARED) save(STORE_VOTES, votes);
+    refreshAll();
     toast("Your votes were reset");
   };
 
+  // ---- boot ----
+  setModePill();
   build();
+  if(SHARED){
+    initFirebase().catch(err=>{
+      console.error("Firebase init failed:", err);
+      toast("⚠️ Live voting unavailable — check Firebase config");
+    });
+  }
 </script>
 </body>
 </html>
