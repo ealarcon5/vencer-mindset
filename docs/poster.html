@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Scan to Vote — 4th of July Parade</title>
+<style>
+  @page{ size:portrait; margin:0; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(135deg,#0a2463,#1d3f9e 55%,#B22234 130%);
+    color:#fff;min-height:100vh;
+    display:flex;align-items:center;justify-content:center;padding:32px;
+  }
+  .card{
+    background:#fff;color:#111a2e;border-radius:28px;
+    max-width:520px;width:100%;text-align:center;
+    padding:38px 34px 42px;box-shadow:0 20px 60px rgba(0,0,0,.35);
+    border-top:10px solid #C9A87C;position:relative;overflow:hidden;
+  }
+  .flag{height:8px;background:repeating-linear-gradient(90deg,#B22234 0 10%,#fff 10% 20%);
+    position:absolute;top:0;left:0;right:0;}
+  .kicker{text-transform:uppercase;letter-spacing:3px;font-size:.8rem;font-weight:800;color:#B22234;margin:14px 0 6px;}
+  h1{font-size:2.1rem;color:#0a2463;line-height:1.1;margin-bottom:6px;}
+  .stars{color:#ffd54a;font-size:1.3rem;letter-spacing:8px;margin:10px 0 4px;-webkit-text-stroke:1px #e0a400;}
+  .qr{margin:22px auto 14px;width:300px;height:300px;border:6px solid #0a2463;border-radius:18px;padding:10px;background:#fff;}
+  .qr img{width:100%;height:100%;display:block;}
+  .scan{font-size:1.5rem;font-weight:900;color:#B22234;margin-bottom:4px;}
+  .url{font-size:1rem;font-weight:700;color:#0a2463;word-break:break-all;}
+  .sub{color:#5b6478;font-size:.95rem;margin-top:14px;line-height:1.5;}
+  @media print{ body{background:#fff;padding:0;} .card{box-shadow:none;max-width:100%;border-radius:0;min-height:100vh;justify-content:center;display:flex;flex-direction:column;} }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="flag"></div>
+    <div class="kicker">Monmouth &amp; Independence · Oregon</div>
+    <h1>🎆 Vote for Your<br/>Favorite Float! 🎆</h1>
+    <div class="stars">★ ★ ★ ★ ★</div>
+    <div class="qr"><img src="./qr-code.png" alt="QR code to the parade float voting site" /></div>
+    <div class="scan">📱 Scan to Vote</div>
+    <div class="url">ealarcon5.github.io/vencer-mindset</div>
+    <div class="sub">Pick your favorite in each category — Most Patriotic 🇺🇸,
+      Most Creative 🎨, and Crowd Favorite ⭐. Happy 4th of July!</div>
+  </div>
+</body>
+</html>

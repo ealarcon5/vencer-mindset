@@ -211,56 +211,39 @@
 <script>
 /* ============================================================
    PARADE FLOAT VOTING
-   Edit the CATEGORIES array below to change categories & floats.
+   -----------------------------------------------------------
+   ONE shared list of floats (FLOATS) is judged under each of
+   the category "lenses" (CATEGORIES). Every category keeps its
+   own separate Top 3 tally over the same floats.
+
+   TO ADD / EDIT FLOATS: just edit the FLOATS array below.
+   Give every float a UNIQUE id. That's the only list to touch.
+
    Votes are stored in this browser (localStorage) so people
    can't vote twice from the same phone. See README for how to
    swap in a shared backend if you want one combined tally.
    ============================================================ */
 
-  const CATEGORIES = [
-    {
-      id: "patriotic",
-      name: "Most Patriotic",
-      emoji: "🇺🇸",
-      blurb: "Red, white & blue done right — the float that made you feel it.",
-      floats: [
-        { id:"p1", name:"Stars & Stripes Express", org:"Independence Rotary Club", emoji:"🎇" },
-        { id:"p2", name:"Freedom Riders", org:"Local Veterans Association", emoji:"🦅" },
-        { id:"p3", name:"Liberty Belle", org:"Monmouth Main Street", emoji:"🔔" },
-        { id:"p4", name:"Old Glory Wagon", org:"4-H Youth Club", emoji:"🐴" },
-        { id:"p5", name:"Salute to Service", org:"American Legion Post", emoji:"🎖️" },
-      ],
-    },
-    {
-      id: "creative",
-      name: "Most Creative",
-      emoji: "🎨",
-      blurb: "Wildest idea, best build, most 'how'd they do that?'",
-      floats: [
-        { id:"c1", name:"The Rolling Rocket", org:"Central High Robotics", emoji:"🚀" },
-        { id:"c2", name:"Under the Sea Parade", org:"Independence Library", emoji:"🐙" },
-        { id:"c3", name:"Hop Harvest Hayride", org:"Independence Hop & Heritage", emoji:"🌿" },
-        { id:"c4", name:"Dino Days", org:"Ash Creek Elementary", emoji:"🦕" },
-        { id:"c5", name:"Steampunk Station", org:"Willamette Makers", emoji:"⚙️" },
-      ],
-    },
-    {
-      id: "crowd",
-      name: "Crowd Favorite",
-      emoji: "⭐",
-      blurb: "The float that got the biggest cheer down the whole route.",
-      floats: [
-        { id:"f1", name:"Vencer Baseball Home Run Float", org:"Vencer Baseball", emoji:"⚾" },
-        { id:"f2", name:"Doggie Parade Brigade", org:"Polk County Humane Society", emoji:"🐕" },
-        { id:"f3", name:"Sweet Treats Trolley", org:"Downtown Ice Cream Co.", emoji:"🍦" },
-        { id:"f4", name:"Fire &amp; Rescue Classic", org:"Monmouth Fire Dept.", emoji:"🚒" },
-        { id:"f5", name:"Marching Band Mania", org:"Central High Panthers", emoji:"🎺" },
-      ],
-    },
+  // ---- The real parade entries (edit this list) ----
+  const FLOATS = [
+    { id:"wolfpack",  name:"Wolfpack Martial Arts", org:"Wolfpack Martial Arts", emoji:"🥋" },
+    { id:"minet",     name:"MINET Fiber",           org:"MINET Fiber",           emoji:"🌐" },
+    { id:"cwrestle",  name:"Central Wrestling",     org:"Central High Wrestling", emoji:"🤼" },
+    { id:"monfit",    name:"Monmouth Fitness Club", org:"Monmouth Fitness Club", emoji:"💪" },
+    { id:"lesschwab", name:"Les Schwab",            org:"Les Schwab Tires",      emoji:"🛞" },
+    // Add more real floats here, e.g.:
+    // { id:"uniqueId", name:"Float Name", org:"Group / Sponsor", emoji:"🎇" },
   ];
 
-  const STORE_VOTES = "parade_votes_v1";   // { floatId: count }
-  const STORE_MINE  = "parade_myvotes_v1"; // { categoryId: floatId }
+  // ---- The judging categories (the "lenses") ----
+  const CATEGORIES = [
+    { id:"patriotic", name:"Most Patriotic", emoji:"🇺🇸", blurb:"Red, white & blue done right — the float that made you feel it." },
+    { id:"creative",  name:"Most Creative",  emoji:"🎨", blurb:"Wildest idea, best build, most 'how'd they do that?'" },
+    { id:"crowd",     name:"Crowd Favorite", emoji:"⭐", blurb:"The float that got the biggest cheer down the whole route." },
+  ];
+
+  const STORE_VOTES = "parade_votes_v2";   // { catId: { floatId: count } }
+  const STORE_MINE  = "parade_myvotes_v2"; // { catId: floatId }
 
   function load(key, fallback){
     try{ return JSON.parse(localStorage.getItem(key)) || fallback; }
@@ -271,10 +254,13 @@
   let votes  = load(STORE_VOTES, {});
   let myVotes = load(STORE_MINE, {});
 
-  // seed any float missing a count
-  CATEGORIES.forEach(cat => cat.floats.forEach(f => {
-    if(votes[f.id] === undefined) votes[f.id] = 0;
-  }));
+  // seed: every category holds a count for every float
+  CATEGORIES.forEach(cat => {
+    if(!votes[cat.id]) votes[cat.id] = {};
+    FLOATS.forEach(f => {
+      if(votes[cat.id][f.id] === undefined) votes[cat.id][f.id] = 0;
+    });
+  });
 
   const tabsEl = document.getElementById("tabs");
   const panelsEl = document.getElementById("panels");
@@ -292,17 +278,14 @@
     tabsEl.innerHTML = "";
     panelsEl.innerHTML = "";
     CATEGORIES.forEach(cat => {
-      // tab
       const tab = document.createElement("button");
       tab.className = "tab" + (cat.id===activeCat ? " active":"");
       tab.innerHTML = `<span class="cat-emoji">${cat.emoji}</span>${cat.name}`;
       tab.onclick = () => { activeCat = cat.id; build(); };
       tabsEl.appendChild(tab);
 
-      // panel
       const panel = document.createElement("section");
       panel.className = "cat-panel" + (cat.id===activeCat ? " active":"");
-
       panel.innerHTML = `
         <div class="cat-head">
           <h2>${cat.emoji} ${cat.name}</h2>
@@ -324,21 +307,21 @@
 
   function renderLeaderboard(cat){
     const el = document.getElementById("lb-"+cat.id);
-    const ranked = [...cat.floats].sort((a,b)=> votes[b.id]-votes[a.id]);
+    const tally = votes[cat.id];
+    const ranked = [...FLOATS].sort((a,b)=> tally[b.id]-tally[a.id]);
     const top = ranked.slice(0,3);
-    const totalVotes = cat.floats.reduce((s,f)=>s+votes[f.id],0);
-    const anyVotes = totalVotes > 0;
+    const totalVotes = FLOATS.reduce((s,f)=>s+tally[f.id],0);
 
-    if(!anyVotes){
+    if(totalVotes === 0){
       el.innerHTML = `<div class="empty">No votes yet — be the first to pick a winner! 🎉</div>`;
       return;
     }
-    const max = Math.max(...cat.floats.map(f=>votes[f.id]), 1);
+    const max = Math.max(...FLOATS.map(f=>tally[f.id]), 1);
     el.innerHTML = top.map((f,i)=>{
-      const v = votes[f.id];
+      const v = tally[f.id];
       const pct = Math.round((v/max)*100);
-      const rankClass = i===0?"rank-1":i===1?"rank-2":i===2?"rank-3":"rank-x";
-      const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+      const rankClass = i===0?"rank-1":i===1?"rank-2":"rank-3";
+      const medal = i===0?"🥇":i===1?"🥈":"🥉";
       return `
         <div class="podium-row">
           <div class="rank-badge ${rankClass}">${i+1}</div>
@@ -353,8 +336,9 @@
 
   function renderFloats(cat){
     const el = document.getElementById("floats-"+cat.id);
+    const tally = votes[cat.id];
     const mine = myVotes[cat.id];
-    el.innerHTML = cat.floats.map(f=>{
+    el.innerHTML = FLOATS.map(f=>{
       const voted = mine === f.id;
       return `
         <div class="float-card ${voted?"voted":""}">
@@ -367,7 +351,7 @@
           </div>
           <button class="vote-btn" data-cat="${cat.id}" data-float="${f.id}">
             ${voted ? "Your pick" : "Vote"}
-            <span class="count">${votes[f.id]}</span>
+            <span class="count">${tally[f.id]}</span>
           </button>
           <div class="voted-note">${voted ? "✓ You voted for this float" : ""}</div>
         </div>`;
@@ -380,20 +364,17 @@
 
   function castVote(catId, floatId){
     const cat = CATEGORIES.find(c=>c.id===catId);
-    const float = cat.floats.find(f=>f.id===floatId);
+    const float = FLOATS.find(f=>f.id===floatId);
+    const tally = votes[catId];
     const prev = myVotes[catId];
 
     if(prev === floatId){
-      // un-vote (toggle off)
-      votes[floatId] = Math.max(0, votes[floatId]-1);
+      tally[floatId] = Math.max(0, tally[floatId]-1);
       delete myVotes[catId];
       toast("↩️ Vote removed");
     } else {
-      if(prev){
-        // move vote from previous pick
-        votes[prev] = Math.max(0, votes[prev]-1);
-      }
-      votes[floatId] = (votes[floatId]||0)+1;
+      if(prev) tally[prev] = Math.max(0, tally[prev]-1);
+      tally[floatId] = (tally[floatId]||0)+1;
       myVotes[catId] = floatId;
       toast(`✓ Voted: <strong style="margin-left:4px">${float.name}</strong>`);
     }
@@ -407,7 +388,7 @@
     if(!confirm("Remove your votes from this device? (Everyone else's votes stay.)")) return;
     Object.keys(myVotes).forEach(catId=>{
       const fId = myVotes[catId];
-      if(votes[fId]) votes[fId] = Math.max(0, votes[fId]-1);
+      if(votes[catId] && votes[catId][fId]) votes[catId][fId] = Math.max(0, votes[catId][fId]-1);
     });
     myVotes = {};
     save(STORE_VOTES, votes);
