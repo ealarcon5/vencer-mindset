@@ -1,12 +1,15 @@
 import { useCallback, useState } from "react";
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from "react-native";
+import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useAuth } from "../../lib/auth";
 import { myBets } from "../../lib/bets";
 import { supabase } from "../../lib/supabase";
 import { humanCountdown, localDateKey, deviceTimezone } from "../../lib/time";
 import type { Bet, Checkin } from "../../lib/database.types";
-import { colors, spacing, radius } from "../../constants/theme";
+import {
+  Header, Text, Card, Money, Symbol, EmptyState, Button,
+} from "../../components/ui";
+import { colors, spacing, screen, radius } from "../../constants/theme";
 
 type Row = { bet: Bet; checkin: Checkin | null };
 
@@ -20,12 +23,10 @@ export default function Home() {
   const load = useCallback(async () => {
     if (!uid) return;
     const bets = (await myBets(uid)).filter((b) => b.status === "active");
-    const tz = deviceTimezone();
-    const key = localDateKey(tz);
+    const key = localDateKey(deviceTimezone());
     const withCheckins = await Promise.all(
       bets.map(async (bet) => {
-        const { data } = await supabase
-          .from("checkins").select("*")
+        const { data } = await supabase.from("checkins").select("*")
           .eq("bet_id", bet.id).eq("user_id", uid).eq("local_date", key).maybeSingle();
         return { bet, checkin: (data as Checkin) ?? null };
       }),
@@ -35,71 +36,87 @@ export default function Home() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const openToday = rows.filter((r) => r.checkin && r.checkin.status !== "verified" && r.checkin.status !== "failed");
+
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={{ padding: spacing.md, paddingBottom: 120 }}
-      data={rows}
-      keyExtractor={(r) => r.bet.id}
-      refreshControl={
-        <RefreshControl tintColor={colors.gold} refreshing={refreshing}
-          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />
-      }
-      ListHeaderComponent={
-        <View style={{ marginBottom: spacing.md }}>
-          <Text style={styles.h1}>Today</Text>
-          <Text style={styles.sub}>Keep your word. Prove it before midnight.</Text>
-        </View>
-      }
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>No active bets yet.</Text>
-          <Pressable style={styles.cta} onPress={() => router.push("/bet/create")}>
-            <Text style={styles.ctaText}>+ Start a bet</Text>
-          </Pressable>
-        </View>
-      }
-      renderItem={({ item }) => {
-        const done = item.checkin?.status === "verified";
-        const missed = item.checkin?.status === "failed";
-        return (
-          <Pressable style={styles.card} onPress={() => router.push(`/bet/${item.bet.id}`)}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>{item.bet.title}</Text>
-              <Text style={styles.cardMeta}>
-                ${item.bet.stake_amount} on the line
-                {item.checkin ? ` · due ${humanCountdown(item.checkin.due_at)}` : ""}
+    <View style={styles.flex}>
+      <Header title="Today" subtitle={greeting()} actionSymbol="plus" onAction={() => router.push("/bet/create")} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={<RefreshControl refreshing={refreshing}
+          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+      >
+        {rows.length === 0 ? (
+          <EmptyState symbol="target" title="No active bets" message="Start a bet with a friend and put something real on the line." />
+        ) : (
+          <>
+            {openToday.length > 0 && (
+              <Text variant="footnote" tone="secondary" style={styles.sectionLabel}>
+                {openToday.length} TO PROVE BEFORE MIDNIGHT
               </Text>
-            </View>
-            <View style={[styles.badge, done && styles.badgeDone, missed && styles.badgeMiss]}>
-              <Text style={styles.badgeText}>
-                {done ? "✓ Done" : missed ? "✗ Missed" : "Log proof"}
-              </Text>
-            </View>
-          </Pressable>
-        );
-      }}
-    />
+            )}
+            {rows.map(({ bet, checkin }) => (
+              <Card key={bet.id} onPress={() => router.push(`/bet/${bet.id}`)} style={styles.card}>
+                <View style={styles.cardRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="headline">{bet.title}</Text>
+                    <View style={styles.metaRow}>
+                      <Money amount={Number(bet.stake_amount)} variant="footnote" tone="secondary" />
+                      {checkin ? (
+                        <Text variant="footnote" tone="secondary"> · due {humanCountdown(checkin.due_at)}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <StatusChip status={checkin?.status} />
+                </View>
+              </Card>
+            ))}
+          </>
+        )}
+
+        {rows.length > 0 && (
+          <View style={{ paddingHorizontal: screen.margin, marginTop: spacing.sm }}>
+            <Button label="New bet" variant="secondary" onPress={() => router.push("/bet/create")} />
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
+function StatusChip({ status }: { status?: string }) {
+  if (status === "verified")
+    return <Chip bg={colors.success} symbol="checkmark" label="Done" />;
+  if (status === "failed")
+    return <Chip bg={colors.danger} symbol="xmark" label="Missed" />;
+  if (status === "submitted")
+    return <Chip bg={colors.warning} symbol="clock" label="Pending" />;
+  return <Chip bg={colors.fill} symbol="camera" label="Prove" />;
+}
+
+function Chip({ bg, symbol, label }: { bg: string; symbol: string; label: string }) {
+  return (
+    <View style={[styles.chip, { backgroundColor: bg }]}>
+      <Symbol name={symbol as any} size={12} color={colors.textOnDark} weight="bold" />
+      <Text variant="footnote" tone="onDark" style={{ fontWeight: "600" }}>{label}</Text>
+    </View>
+  );
+}
+
+function greeting(): string {
+  return "Keep your word.";
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  h1: { color: colors.text, fontSize: 28, fontWeight: "800" },
-  sub: { color: colors.textDim, marginTop: 4 },
-  card: {
-    flexDirection: "row", alignItems: "center", backgroundColor: colors.card,
-    borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm,
-    borderWidth: 1, borderColor: colors.border,
+  flex: { flex: 1, backgroundColor: colors.grouped },
+  content: { paddingBottom: 120 },
+  sectionLabel: { marginHorizontal: screen.margin, marginBottom: spacing.sm, marginTop: spacing.xs },
+  card: { marginBottom: spacing.md },
+  cardRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  metaRow: { flexDirection: "row", alignItems: "center", marginTop: spacing.xs },
+  chip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: spacing.md, height: 32, borderRadius: radius.pill,
   },
-  cardTitle: { color: colors.text, fontSize: 17, fontWeight: "700" },
-  cardMeta: { color: colors.textDim, marginTop: 4, fontSize: 13 },
-  badge: { backgroundColor: colors.gold, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
-  badgeDone: { backgroundColor: colors.green },
-  badgeMiss: { backgroundColor: colors.red },
-  badgeText: { color: colors.bg, fontWeight: "800", fontSize: 13 },
-  empty: { alignItems: "center", marginTop: spacing.xl },
-  emptyText: { color: colors.textDim, marginBottom: spacing.md },
-  cta: { backgroundColor: colors.gold, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  ctaText: { color: colors.bg, fontWeight: "800" },
 });

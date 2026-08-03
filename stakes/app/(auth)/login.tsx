@@ -1,15 +1,15 @@
 import { useState } from "react";
-import {
-  View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, radius } from "../../constants/theme";
+import { Text, Button, Field, Symbol } from "../../components/ui";
+import { colors, spacing, screen } from "../../constants/theme";
 
 export default function Login() {
   const { signInWithPhone, verifyOtp } = useAuth();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
-  const [stage, setStage] = useState<"phone" | "code">("phone");
+  const [stage, setStage] = useState<"intro" | "phone" | "code">("intro");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,72 +30,85 @@ export default function Login() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
-    >
-      <Text style={styles.brand}>STAKES</Text>
-      <Text style={styles.tagline}>Bet on your own accountability.</Text>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.flex}
+      >
+        {stage === "intro" ? (
+          <View style={styles.intro}>
+            <View style={styles.mark}>
+              <Symbol name="flame.fill" size={40} color={colors.text} weight="semibold" />
+            </View>
+            <Text variant="largeTitle" center style={{ marginTop: spacing.xl }}>Stakes</Text>
+            <Text variant="title3" tone="secondary" center style={{ marginTop: spacing.sm, maxWidth: 300 }}>
+              Put money on your word. Keep it, or your friend does.
+            </Text>
+            <View style={styles.introFooter}>
+              <Button label="Get started" onPress={() => setStage("phone")} />
+              <Text variant="caption" tone="tertiary" center style={{ marginTop: spacing.md }}>
+                For ages 18+. By continuing you agree to the Terms & Privacy Policy.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.form}>
+            <Text variant="title1">
+              {stage === "phone" ? "What's your number?" : "Enter your code"}
+            </Text>
+            <Text variant="subhead" tone="secondary" style={{ marginTop: spacing.xs, marginBottom: spacing.xl }}>
+              {stage === "phone"
+                ? "We'll text you a code to sign in. Your number is how friends find you."
+                : `Sent to ${phone}.`}
+            </Text>
 
-      {stage === "phone" ? (
-        <>
-          <Text style={styles.label}>Your phone number</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="(555) 123-4567"
-            placeholderTextColor={colors.textDim}
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
-            autoFocus
-          />
-          <Button label="Send code" onPress={sendCode} busy={busy} />
-        </>
-      ) : (
-        <>
-          <Text style={styles.label}>Enter the 6-digit code</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="123456"
-            placeholderTextColor={colors.textDim}
-            keyboardType="number-pad"
-            value={code}
-            onChangeText={setCode}
-            autoFocus
-          />
-          <Button label="Verify & continue" onPress={confirm} busy={busy} />
-          <Pressable onPress={() => setStage("phone")}>
-            <Text style={styles.link}>Use a different number</Text>
-          </Pressable>
-        </>
-      )}
+            {stage === "phone" ? (
+              <Field
+                label="Phone"
+                placeholder="(555) 123-4567"
+                keyboardType="phone-pad"
+                textContentType="telephoneNumber"
+                value={phone}
+                onChangeText={setPhone}
+                autoFocus
+              />
+            ) : (
+              <Field
+                label="6-digit code"
+                placeholder="123456"
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                value={code}
+                onChangeText={setCode}
+                autoFocus
+              />
+            )}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-    </KeyboardAvoidingView>
-  );
-}
+            {error ? <Text variant="footnote" tone="danger" style={{ marginBottom: spacing.md }}>{error}</Text> : null}
 
-function Button({ label, onPress, busy }: { label: string; onPress: () => void; busy: boolean }) {
-  return (
-    <Pressable style={styles.button} onPress={onPress} disabled={busy}>
-      {busy ? <ActivityIndicator color={colors.bg} /> : <Text style={styles.buttonText}>{label}</Text>}
-    </Pressable>
+            <Button
+              label={stage === "phone" ? "Send code" : "Verify & continue"}
+              onPress={stage === "phone" ? sendCode : confirm}
+              loading={busy}
+            />
+            <Pressable onPress={() => { setError(null); setStage(stage === "code" ? "phone" : "intro"); }} style={{ marginTop: spacing.lg }}>
+              <Text variant="subhead" tone="accent" center>Back</Text>
+            </Pressable>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, justifyContent: "center", padding: spacing.lg },
-  brand: { color: colors.gold, fontSize: 40, fontWeight: "800", letterSpacing: 4, textAlign: "center" },
-  tagline: { color: colors.textDim, textAlign: "center", marginBottom: spacing.xl, marginTop: spacing.sm },
-  label: { color: colors.text, marginBottom: spacing.sm, fontWeight: "600" },
-  input: {
-    backgroundColor: colors.card, color: colors.text, borderRadius: radius.md,
-    padding: spacing.md, fontSize: 18, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,
+  safe: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
+  intro: { flex: 1, alignItems: "center", justifyContent: "center", padding: screen.margin },
+  mark: {
+    width: 88, height: 88, borderRadius: 24, backgroundColor: colors.grouped,
+    alignItems: "center", justifyContent: "center",
   },
-  button: {
-    backgroundColor: colors.gold, borderRadius: radius.md, padding: spacing.md, alignItems: "center",
-  },
-  buttonText: { color: colors.bg, fontWeight: "800", fontSize: 16 },
-  link: { color: colors.gold, textAlign: "center", marginTop: spacing.md },
-  error: { color: colors.red, textAlign: "center", marginTop: spacing.md },
+  introFooter: { position: "absolute", left: screen.margin, right: screen.margin, bottom: spacing.xxl },
+  form: { flex: 1, justifyContent: "center", paddingHorizontal: screen.margin, paddingBottom: spacing.huge },
 });

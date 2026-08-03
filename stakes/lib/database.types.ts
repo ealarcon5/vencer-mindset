@@ -3,7 +3,7 @@
 //   npx supabase gen types typescript --project-id <ref> > lib/database.types.ts
 
 export type BetType = "daily_habit" | "head_to_head" | "bounty";
-export type BetStatus = "draft" | "invited" | "active" | "settled" | "canceled";
+export type BetStatus = "draft" | "invited" | "funding" | "active" | "settled" | "canceled";
 export type ParticipantStatus =
   | "invited" | "active" | "failed" | "won" | "declined";
 export type CheckinStatus = "pending" | "submitted" | "verified" | "failed";
@@ -36,6 +36,8 @@ export interface Bet {
   proof_mode: string;
   status: BetStatus;
   winner_id: string | null;
+  funding_status: string;
+  pot_amount: number;
   created_at: string;
 }
 
@@ -48,6 +50,8 @@ export interface BetParticipant {
   current_streak: number;
   missed_count: number;
   accepted_at: string | null;
+  funded: boolean;
+  payment_intent_id: string | null;
 }
 
 export interface Checkin {

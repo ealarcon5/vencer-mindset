@@ -48,16 +48,35 @@ export async function createBet(creatorId: string, input: CreateBetInput) {
   return bet as Bet;
 }
 
-/** Opponent accepts an invite → activate the bet and generate the check-in grid. */
+/**
+ * Opponent accepts an invite → move the bet into the FUNDING stage. Both players
+ * must now pay their stake into escrow (see lib/stripe.ts `fundStake`). The bet
+ * only activates once the Stripe webhook confirms both payments (mark_funded),
+ * which generates the check-in grid via activate_bet.
+ */
 export async function acceptBet(betId: string, userId: string) {
   await supabase
     .from("bet_participants")
     .update({ status: "active", accepted_at: new Date().toISOString() })
     .eq("bet_id", betId)
     .eq("user_id", userId);
-  // activate_bet is a SECURITY DEFINER function that flips status + builds checkins.
-  const { error } = await supabase.rpc("activate_bet", { p_bet_id: betId });
-  if (error) throw error;
+  // Flag the bet as funding (no-op if it already advanced).
+  await supabase.from("bets").update({ status: "funding" })
+    .eq("id", betId).eq("status", "invited");
+}
+
+/** Has the given user paid their stake for this bet? */
+export async function myFundingState(betId: string, userId: string) {
+  const { data } = await supabase.from("bet_participants")
+    .select("funded, status").eq("bet_id", betId).eq("user_id", userId).maybeSingle();
+  return data as { funded: boolean; status: string } | null;
+}
+
+/** Payment history (charges + payouts) for the wallet. */
+export async function myPayments(userId: string) {
+  const { data } = await supabase.from("payments").select("*")
+    .eq("user_id", userId).order("created_at", { ascending: false });
+  return data ?? [];
 }
 
 export async function declineBet(betId: string, userId: string) {

@@ -1,17 +1,18 @@
 import { useCallback, useState } from "react";
-import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert,
-} from "react-native";
+import { View, ScrollView, StyleSheet, Alert } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useAuth } from "../../lib/auth";
 import { supabase } from "../../lib/supabase";
 import { createBet } from "../../lib/bets";
 import { localDateKey, deviceTimezone } from "../../lib/time";
 import type { Profile } from "../../lib/database.types";
-import { colors, spacing, radius } from "../../constants/theme";
+import {
+  Text, Field, Segmented, Button, ListSection, ListRow, Money, EmptyState,
+} from "../../components/ui";
+import { colors, spacing, screen } from "../../constants/theme";
 
-const METRICS = ["reps", "pages", "miles", "minutes"];
-const PROOF_MODES = ["honor", "photo", "video", "health"];
+const METRICS = ["reps", "pages", "miles", "minutes"] as const;
+const PROOF = ["honor", "photo", "video", "health"] as const;
 
 export default function CreateBet() {
   const { session } = useAuth();
@@ -21,12 +22,12 @@ export default function CreateBet() {
   const [friends, setFriends] = useState<Profile[]>([]);
   const [opponent, setOpponent] = useState<Profile | null>(null);
   const [title, setTitle] = useState("200 push-ups");
-  const [metric, setMetric] = useState("reps");
+  const [metric, setMetric] = useState<(typeof METRICS)[number]>("reps");
   const [target, setTarget] = useState("200");
   const [days, setDays] = useState("30");
   const [stake, setStake] = useState("50");
   const [restDays, setRestDays] = useState("0");
-  const [proofMode, setProofMode] = useState("honor");
+  const [proofMode, setProofMode] = useState<(typeof PROOF)[number]>("photo");
   const [busy, setBusy] = useState(false);
 
   useFocusEffect(useCallback(() => {
@@ -39,26 +40,19 @@ export default function CreateBet() {
 
   async function submit() {
     if (!uid) return;
-    if (!opponent) return Alert.alert("Pick an opponent");
+    if (!opponent) return Alert.alert("Pick who you're betting");
     setBusy(true);
     try {
       const tz = deviceTimezone();
       const start = localDateKey(tz);
       const end = addDays(start, Math.max(1, parseInt(days) || 1) - 1);
-      await createBet(uid, {
-        opponentId: opponent.id,
-        title: title.trim(),
-        metric,
-        target: parseFloat(target) || 1,
-        startDate: start,
-        endDate: end,
-        deadlineLocalTime: "23:59",
-        stakeAmount: parseFloat(stake) || 0,
-        restDaysAllowed: parseInt(restDays) || 0,
-        proofMode,
+      const bet = await createBet(uid, {
+        opponentId: opponent.id, title: title.trim(), metric,
+        target: parseFloat(target) || 1, startDate: start, endDate: end,
+        deadlineLocalTime: "23:59", stakeAmount: parseFloat(stake) || 0,
+        restDaysAllowed: parseInt(restDays) || 0, proofMode,
       });
-      Alert.alert("Bet sent!", `${opponent.display_name} needs to accept it.`);
-      router.back();
+      router.replace(`/bet/${bet.id}`);
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? String(e));
     } finally {
@@ -66,71 +60,72 @@ export default function CreateBet() {
     }
   }
 
+  const stakeNum = parseFloat(stake) || 0;
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ padding: spacing.md, paddingBottom: 60 }}>
-      <Text style={styles.h1}>New bet</Text>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text variant="largeTitle" style={styles.title}>New bet</Text>
 
-      <Label>Opponent</Label>
-      <View style={styles.chips}>
-        {friends.length === 0 && <Text style={styles.dim}>Add friends first (Friends tab).</Text>}
-        {friends.map((f) => (
-          <Chip key={f.id} label={f.display_name} active={opponent?.id === f.id}
-            onPress={() => setOpponent(f)} />
-        ))}
+      {/* Opponent */}
+      {friends.length === 0 ? (
+        <EmptyState symbol="person.2" title="No friends yet" message="Add a friend first to bet them." />
+      ) : (
+        <ListSection header="Betting against">
+          {friends.map((f) => (
+            <ListRow
+              key={f.id}
+              title={f.display_name}
+              leadingSymbol={opponent?.id === f.id ? "checkmark.circle.fill" : "circle"}
+              leadingColor={opponent?.id === f.id ? colors.accent : colors.grouped}
+              onPress={() => setOpponent(f)}
+            />
+          ))}
+        </ListSection>
+      )}
+
+      {/* Goal */}
+      <View style={styles.block}>
+        <Field label="Goal" value={title} onChangeText={setTitle} placeholder="200 push-ups" />
+        <Text variant="footnote" tone="secondary" style={styles.miniLabel}>MEASURED IN</Text>
+        <Segmented options={METRICS as unknown as string[]} value={metric} onChange={(v) => setMetric(v as any)} />
       </View>
 
-      <Label>Goal</Label>
-      <TextInput style={styles.input} value={title} onChangeText={setTitle} />
-
-      <Label>Metric</Label>
-      <View style={styles.chips}>
-        {METRICS.map((m) => <Chip key={m} label={m} active={metric === m} onPress={() => setMetric(m)} />)}
+      <View style={styles.block}>
+        <View style={styles.row}>
+          <View style={styles.half}><Field label="Target / day" value={target} onChangeText={setTarget} keyboardType="numeric" /></View>
+          <View style={styles.half}><Field label="Duration (days)" value={days} onChangeText={setDays} keyboardType="numeric" /></View>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.half}><Field label="Stake ($)" value={stake} onChangeText={setStake} keyboardType="numeric" /></View>
+          <View style={styles.half}><Field label="Rest days" value={restDays} onChangeText={setRestDays} keyboardType="numeric" /></View>
+        </View>
       </View>
 
-      <Row>
-        <Field label="Target" value={target} onChange={setTarget} keyboard="numeric" />
-        <Field label="Days" value={days} onChange={setDays} keyboard="numeric" />
-      </Row>
-      <Row>
-        <Field label="Stake ($)" value={stake} onChange={setStake} keyboard="numeric" />
-        <Field label="Rest days" value={restDays} onChange={setRestDays} keyboard="numeric" />
-      </Row>
-
-      <Label>Proof method</Label>
-      <View style={styles.chips}>
-        {PROOF_MODES.map((p) => <Chip key={p} label={p} active={proofMode === p} onPress={() => setProofMode(p)} />)}
+      <View style={styles.block}>
+        <Text variant="footnote" tone="secondary" style={styles.miniLabel}>PROOF EACH DAY</Text>
+        <Segmented options={PROOF as unknown as string[]} value={proofMode} onChange={(v) => setProofMode(v as any)} />
       </View>
-      <Text style={styles.dim}>
-        Deadline is 11:59pm your local time each day. Miss it (beyond your rest
-        days) and the stake goes to your opponent.
-      </Text>
 
-      <Pressable style={[styles.submit, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy}>
-        <Text style={styles.submitText}>{busy ? "Sending…" : "Send bet"}</Text>
-      </Pressable>
+      {/* Pot summary */}
+      <View style={styles.potCard}>
+        <View style={styles.potRow}>
+          <Text variant="subhead" tone="secondary">You each stake</Text>
+          <Money amount={stakeNum} variant="headline" />
+        </View>
+        <View style={styles.potRow}>
+          <Text variant="subhead" tone="secondary">Winner takes (before fees)</Text>
+          <Money amount={stakeNum * 2} variant="headline" tone="success" />
+        </View>
+        <Text variant="caption" tone="tertiary" style={{ marginTop: spacing.sm }}>
+          Your ${stakeNum || 0} is charged and held in escrow when both of you pay in. Miss a day past
+          your rest days and it goes to {opponent?.display_name ?? "your friend"}.
+        </Text>
+      </View>
+
+      <View style={styles.footer}>
+        <Button label="Send bet" onPress={submit} loading={busy} disabled={!opponent} />
+      </View>
     </ScrollView>
-  );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.label}>{children}</Text>;
-}
-function Row({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: "row", gap: spacing.sm }}>{children}</View>;
-}
-function Field({ label, value, onChange, keyboard }: any) {
-  return (
-    <View style={{ flex: 1 }}>
-      <Label>{label}</Label>
-      <TextInput style={styles.input} value={value} onChangeText={onChange} keyboardType={keyboard} />
-    </View>
-  );
-}
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -141,16 +136,14 @@ function addDays(dateStr: string, n: number): string {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  h1: { color: colors.text, fontSize: 26, fontWeight: "800", marginBottom: spacing.md },
-  label: { color: colors.text, fontWeight: "700", marginTop: spacing.md, marginBottom: spacing.xs },
-  input: { backgroundColor: colors.card, color: colors.text, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { backgroundColor: colors.card, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.border },
-  chipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  chipText: { color: colors.text, fontWeight: "600" },
-  chipTextActive: { color: colors.bg },
-  dim: { color: colors.textDim, fontSize: 12, marginTop: spacing.sm },
-  submit: { backgroundColor: colors.gold, borderRadius: radius.md, padding: spacing.md, alignItems: "center", marginTop: spacing.lg },
-  submitText: { color: colors.bg, fontWeight: "800", fontSize: 16 },
+  screen: { flex: 1, backgroundColor: colors.grouped },
+  content: { paddingTop: spacing.lg, paddingBottom: spacing.huge },
+  title: { paddingHorizontal: screen.margin, marginBottom: spacing.lg },
+  block: { paddingHorizontal: screen.margin, marginBottom: spacing.xl },
+  miniLabel: { marginBottom: spacing.sm, marginTop: spacing.xs, marginLeft: spacing.xs },
+  row: { flexDirection: "row", gap: spacing.md },
+  half: { flex: 1 },
+  potCard: { marginHorizontal: screen.margin, backgroundColor: colors.card, borderRadius: 16, padding: spacing.lg, marginBottom: spacing.xl },
+  potRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
+  footer: { paddingHorizontal: screen.margin },
 });

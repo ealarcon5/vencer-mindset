@@ -22,7 +22,14 @@
       "expo-router",
       "expo-contacts",
       "expo-image-picker",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.vencer.stakes",
+          "enableGooglePay": false
+        }
+      ]
     ]
   }
 }

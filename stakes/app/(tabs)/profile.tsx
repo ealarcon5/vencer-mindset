@@ -1,28 +1,26 @@
 import { useCallback, useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
+import { View, ScrollView, StyleSheet, Alert } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "../../lib/auth";
 import { supabase } from "../../lib/supabase";
 import { registerPushToken } from "../../lib/notifications";
 import { deviceTimezone } from "../../lib/time";
 import type { Profile } from "../../lib/database.types";
-import { colors, spacing, radius } from "../../constants/theme";
+import {
+  Header, Text, Field, ListSection, ListRow, Button, Avatar,
+} from "../../components/ui";
+import { colors, spacing, screen } from "../../constants/theme";
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
   const uid = session?.user.id;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState("");
-  const [venmo, setVenmo] = useState("");
 
   const load = useCallback(async () => {
     if (!uid) return;
     const { data } = await supabase.from("profiles").select("*").eq("id", uid).single();
-    if (data) {
-      setProfile(data as Profile);
-      setName(data.display_name ?? "");
-      setVenmo(data.venmo_handle ?? "");
-    }
+    if (data) { setProfile(data as Profile); setName(data.display_name ?? ""); }
   }, [uid]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -31,45 +29,52 @@ export default function ProfileScreen() {
     if (!uid) return;
     await supabase.from("profiles").update({
       display_name: name.trim() || "New user",
-      venmo_handle: venmo.trim().replace(/^@/, "") || null,
       timezone: deviceTimezone(),
     }).eq("id", uid);
     await registerPushToken(uid);
-    Alert.alert("Saved", "Profile updated.");
+    Alert.alert("Saved");
+    load();
   }
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.label}>Display name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName}
-        placeholder="Emiliano" placeholderTextColor={colors.textDim} />
+    <View style={styles.flex}>
+      <Header title="Profile" />
+      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" keyboardDismissMode="interactive">
+        <View style={styles.identity}>
+          <Avatar name={name || "?"} size={72} />
+          <Text variant="title2" style={{ marginTop: spacing.md }}>{name || "New user"}</Text>
+          <Text variant="subhead" tone="secondary">{profile?.phone ?? ""}</Text>
+        </View>
 
-      <Text style={styles.label}>Venmo handle (for payouts)</Text>
-      <TextInput style={styles.input} value={venmo} onChangeText={setVenmo}
-        autoCapitalize="none" placeholder="your-venmo" placeholderTextColor={colors.textDim} />
+        <ListSection header="Your name">
+          <View style={styles.fieldRow}>
+            <Field value={name} onChangeText={setName} placeholder="Your name" autoCapitalize="words" />
+          </View>
+        </ListSection>
 
-      <Text style={styles.meta}>Timezone: {profile?.timezone ?? deviceTimezone()}</Text>
-      <Text style={styles.metaDim}>Deadlines resolve to midnight in this zone.</Text>
+        <ListSection header="Details" footer={`Deadlines resolve to midnight in your timezone.`}>
+          <ListRow title="Timezone" value={profile?.timezone ?? deviceTimezone()} leadingSymbol="clock.fill" leadingColor={colors.textTertiary} />
+          <ListRow title="Notifications" subtitle="Deadline reminders & results" leadingSymbol="bell.fill" leadingColor={colors.textTertiary} />
+        </ListSection>
 
-      <Pressable style={styles.save} onPress={save}>
-        <Text style={styles.saveText}>Save</Text>
-      </Pressable>
+        <ListSection>
+          <ListRow title="Terms of Service" leadingSymbol="doc.text.fill" leadingColor={colors.textTertiary} showChevron onPress={() => {}} />
+          <ListRow title="Privacy Policy" leadingSymbol="hand.raised.fill" leadingColor={colors.textTertiary} showChevron onPress={() => {}} />
+        </ListSection>
 
-      <Pressable style={styles.signout} onPress={signOut}>
-        <Text style={styles.signoutText}>Sign out</Text>
-      </Pressable>
+        <View style={styles.actions}>
+          <Button label="Save" onPress={save} />
+          <Button label="Sign out" variant="destructive" onPress={signOut} />
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
-  label: { color: colors.text, fontWeight: "700", marginTop: spacing.md, marginBottom: spacing.xs },
-  input: { backgroundColor: colors.card, color: colors.text, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
-  meta: { color: colors.text, marginTop: spacing.lg, fontWeight: "600" },
-  metaDim: { color: colors.textDim, fontSize: 12, marginTop: 2 },
-  save: { backgroundColor: colors.gold, borderRadius: radius.md, padding: spacing.md, alignItems: "center", marginTop: spacing.lg },
-  saveText: { color: colors.bg, fontWeight: "800" },
-  signout: { padding: spacing.md, alignItems: "center", marginTop: spacing.sm },
-  signoutText: { color: colors.red, fontWeight: "700" },
+  flex: { flex: 1, backgroundColor: colors.grouped },
+  content: { paddingBottom: 120 },
+  identity: { alignItems: "center", paddingVertical: spacing.lg },
+  fieldRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  actions: { paddingHorizontal: screen.margin, gap: spacing.md, marginTop: spacing.sm },
 });

@@ -1,68 +1,77 @@
-import { useCallback, useState } from "react";
-import { View, Text, FlatList, Pressable, StyleSheet } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { View, ScrollView, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useAuth } from "../../lib/auth";
 import { myBets } from "../../lib/bets";
 import type { Bet } from "../../lib/database.types";
-import { colors, spacing, radius } from "../../constants/theme";
+import {
+  Header, ListSection, ListRow, Money, Segmented, EmptyState,
+} from "../../components/ui";
+import { colors, spacing, screen } from "../../constants/theme";
 
-const STATUS_COLOR: Record<string, string> = {
-  active: colors.gold, invited: colors.yellow, settled: colors.green, canceled: colors.textDim, draft: colors.textDim,
-};
+type Filter = "Active" | "Invites" | "History";
 
 export default function Bets() {
   const { session } = useAuth();
   const router = useRouter();
   const [bets, setBets] = useState<Bet[]>([]);
+  const [filter, setFilter] = useState<Filter>("Active");
   const uid = session?.user.id;
 
   useFocusEffect(useCallback(() => {
     if (uid) myBets(uid).then(setBets);
   }, [uid]));
 
+  const filtered = useMemo(() => bets.filter((b) => {
+    if (filter === "Active") return b.status === "active" || b.status === "funding";
+    if (filter === "Invites") return b.status === "invited" || b.status === "draft";
+    return b.status === "settled" || b.status === "canceled";
+  }), [bets, filter]);
+
   return (
-    <View style={styles.screen}>
-      <FlatList
-        contentContainerStyle={{ padding: spacing.md, paddingBottom: 120 }}
-        data={bets}
-        keyExtractor={(b) => b.id}
-        ListEmptyComponent={<Text style={styles.empty}>No bets yet. Tap + to start one.</Text>}
-        renderItem={({ item }) => (
-          <Pressable style={styles.card} onPress={() => router.push(`/bet/${item.id}`)}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.meta}>
-                ${item.stake_amount} · {item.metric} · {item.start_date} → {item.end_date}
-              </Text>
-            </View>
-            <Text style={[styles.status, { color: STATUS_COLOR[item.status] ?? colors.textDim }]}>
-              {item.status}
-            </Text>
-          </Pressable>
+    <View style={styles.flex}>
+      <Header title="Bets" actionSymbol="plus" onAction={() => router.push("/bet/create")} />
+      <View style={styles.filter}>
+        <Segmented options={["Active", "Invites", "History"]} value={filter} onChange={(v) => setFilter(v as Filter)} />
+      </View>
+      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+        {filtered.length === 0 ? (
+          <EmptyState symbol="tray" title={`No ${filter.toLowerCase()} bets`} />
+        ) : (
+          <ListSection>
+            {filtered.map((b) => (
+              <ListRow
+                key={b.id}
+                title={b.title}
+                subtitle={`${b.target} ${b.metric}/day · ${b.start_date} → ${b.end_date}`}
+                leadingSymbol={symbolFor(b.status)}
+                leadingColor={colorFor(b.status)}
+                onPress={() => router.push(`/bet/${b.id}`)}
+                showChevron
+                rightElement={<Money amount={Number(b.stake_amount)} variant="subhead" tone="secondary" />}
+              />
+            ))}
+          </ListSection>
         )}
-      />
-      <Pressable style={styles.fab} onPress={() => router.push("/bet/create")}>
-        <Text style={styles.fabText}>+</Text>
-      </Pressable>
+      </ScrollView>
     </View>
   );
 }
 
+function symbolFor(status: string): string {
+  return status === "settled" ? "checkmark.seal.fill"
+    : status === "active" ? "flame.fill"
+    : status === "funding" ? "creditcard.fill"
+    : status === "canceled" ? "xmark" : "envelope.fill";
+}
+function colorFor(status: string): string {
+  return status === "settled" ? colors.success
+    : status === "active" ? colors.fill
+    : status === "canceled" ? colors.textTertiary : colors.accent;
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  card: {
-    flexDirection: "row", alignItems: "center", backgroundColor: colors.card,
-    borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  title: { color: colors.text, fontSize: 16, fontWeight: "700" },
-  meta: { color: colors.textDim, marginTop: 4, fontSize: 12 },
-  status: { fontWeight: "800", textTransform: "capitalize", fontSize: 12 },
-  empty: { color: colors.textDim, textAlign: "center", marginTop: spacing.xl },
-  fab: {
-    position: "absolute", right: spacing.lg, bottom: spacing.lg, width: 60, height: 60,
-    borderRadius: 30, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
-  },
-  fabText: { color: colors.bg, fontSize: 32, fontWeight: "800", marginTop: -2 },
+  flex: { flex: 1, backgroundColor: colors.grouped },
+  filter: { paddingHorizontal: screen.margin, paddingBottom: spacing.md },
+  content: { paddingBottom: 120 },
 });
