@@ -1,0 +1,21 @@
+# Expo / RN
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+
+# Native
+ios/
+android/
+
+# Env & secrets
+.env
+.env.local
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Misc
+.DS_Store

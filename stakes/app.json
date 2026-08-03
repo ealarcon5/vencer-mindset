@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Stakes",
+    "slug": "stakes",
+    "scheme": "stakes",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080808",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vencer.stakes",
+      "infoPlist": {
+        "NSContactsUsageDescription": "Stakes uses your contacts to find friends who already have the app.",
+        "NSCameraUsageDescription": "Stakes uses the camera to record proof of your daily goals.",
+        "NSHealthShareUsageDescription": "Stakes reads workout data to auto-verify bets like running a mile.",
+        "LSApplicationQueriesSchemes": ["venmo"]
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-contacts",
+      "expo-image-picker",
+      "expo-notifications"
+    ]
+  }
+}
